@@ -6,14 +6,14 @@ def u_p_path(instance, filename):
     #Profile picture will be uploaded to "images/user_pictures/[instance.username]"
 
     username = User.objects.get(pk=instance.user_id)
-    return "images/user_pictures/{}.png".format(username)
+    return f"images/user_pictures/{username}.png"
 
 
 def u_s_path(instance, filename):
     #Profile picture will be uploaded to "images/user_pictures/[instance.username]"
 
     username = User.objects.get(pk=instance.user_id)
-    return "images/user_signatures/{}.png".format(username)
+    return f"images/user_signatures/{username}.png"
 
 
 RELATIONSHIPS = (
@@ -213,7 +213,7 @@ class Result(models.Model):
     
 
     def __str__(self):
-        return self.get_semester_display() +": " + str(self.total_score)
+        return f"{self.get_semester_display()}: {str(self.total_score)}"
 
     
     def get_courses(self):

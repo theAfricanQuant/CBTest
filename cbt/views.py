@@ -172,7 +172,7 @@ def choose_question(request):
 def questions(request, course, level, semester):
     if not can_like(request):
         return render(request, "cbt/choose.html", {"perm": False})
-    
+
     ques = Question.objects.filter(course=course, level=level, semester=semester)
     AnswerFormSet = modelformset_factory(Answer, fields="__all__", extra=len(ques), max_num=30)
     if request.method == 'POST':
@@ -180,15 +180,10 @@ def questions(request, course, level, semester):
         if formset.is_valid():
             formset.save()
             return HttpResponse("Thank you for taking the exam. We wish you the best of luck.")
-        f_q = zip(formset, ques)
-        return render(request, "cbt/questions.html", {"formset": formset, "ques": ques, "f_q": f_q, "semester": semester, })
-
     else:
         formset = AnswerFormSet(queryset=Answer.objects.none())
-        f_q = zip(formset, ques)
-        return render(request, "cbt/questions.html", {"formset": formset, "ques": ques, "f_q": f_q, "semester": semester, })
-    
-    return render(request, "cbt/questions.html", {"ques": ques, "semester": semester, })
+    f_q = zip(formset, ques)
+    return render(request, "cbt/questions.html", {"formset": formset, "ques": ques, "f_q": f_q, "semester": semester, })
 
 
 
@@ -332,15 +327,15 @@ def level_result(request, level):
     user = UserDetail.objects.get(user=request.user)
     if not can_modify(request, user.user.username):
         return render(request, "cbt/display_result.html", {"perm": False} )
-    
+
     result1 = Result.objects.get(user=user.user, level=level, semester=1)
     result2 = Result.objects.get(user=user.user, level=level, semester=2)
-    results = zip(result1.get_courses(), result2.get_courses())
-    cgpa = (result1.total_score + result2.total_score) / (result1.total_units + result2.total_units)
-    if results:
+    if results := zip(result1.get_courses(), result2.get_courses()):
+        cgpa = (result1.total_score + result2.total_score) / (result1.total_units + result2.total_units)
         return render(request, "cbt/display_result.html", {"user_detail": user, "results": results, "result1": result1, "result2": result2, "cgpa": cgpa, "level": display_level(level), "l_result": True, })
-    
-    return render(request, "cbt/choose.html", {"perm": False} )
+
+    else:
+        return render(request, "cbt/choose.html", {"perm": False} )
     
 
 
@@ -396,15 +391,10 @@ def register_courses(request, username, level, semester):
         if formset.is_valid():
             formset.save()
             return redirect("registered_courses", username=request.user.id, level=level, semester=semester, )
-        f_c = zip(formset, courses) # Formset and courses
-        return render(request, "cbt/courses.html", {"formset": formset, "courses": courses, "f_c": f_c, "semester": display_semester(semester), "level": display_level(level), })
-
     else:
         formset = CourseFormSet(queryset=UserCourse.objects.none())
-        f_c = zip(formset, courses) # Formset and courses
-        return render(request, "cbt/courses.html", {"formset": formset, "courses": courses, "f_c": f_c, "semester": display_semester(semester), "level": display_level(level), })
-    
-    return render(request, "cbt/questions.html", {"courses": courses, "semester": display_semester(semester), "level": display_level(level), })
+    f_c = zip(formset, courses) # Formset and courses
+    return render(request, "cbt/courses.html", {"formset": formset, "courses": courses, "f_c": f_c, "semester": display_semester(semester), "level": display_level(level), })
 
 
 @login_required
@@ -429,9 +419,7 @@ def registered_courses(request, username, level, semester):
     if not can_modify(request, courses[0].user.user.username):
         return render(request, "cbt/choose.html", {"perm": False} )
     elif courses:
-        total_units = 0
-        for c in courses:
-            total_units += c.course.unit
+        total_units = sum(c.course.unit for c in courses)
         return render(request, "cbt/reg_courses.html", {"courses": courses, "total_units": total_units })
     return render(request, "cbt/choose.html", {"perm": False} )
 
@@ -457,15 +445,20 @@ def gen_token(request, username=0):
                 return redirect("tokens", username=u_token.user.id, level=u_token.level, semester=u_token.semester, course=u_token.course.id, )
             else:
                 users = UserCourse.objects.filter(level=int(data["level"]), semester=int(data["semester"]), course=data["course"])
-                u_token = []
-                for u in users:
-                    u_token.append(
-                        Token.objects.create(user=u.user, token = token(), level=int(data["level"]), semester=int(data["semester"]), course=data["course"], )
+                u_token = [
+                    Token.objects.create(
+                        user=u.user,
+                        token=token(),
+                        level=int(data["level"]),
+                        semester=int(data["semester"]),
+                        course=data["course"],
                     )
+                    for u in users
+                ]
                 return redirect("tokens", username=int(username), level=int(data["level"]), semester=int(data["semester"]), course=int(data["course"].id), )
 
         return render(request, "cbt/choose.html", {"form": form, "gen_token": True} )
-    
+
     elif can_add_question(request):
         return render(request, "cbt/choose.html", {"form": form, "gen_token": True} )
 
@@ -540,27 +533,26 @@ def flush_tokens(request, username, level, semester, course):
     If username (i.e username==True), only the Student's Token is deleted based on the course selected.
     Else, all student's tokens for the selected course will be flushed."""
     
-    if can_add_question(request):
-        try:
-            if int(username):
-                user = UserDetail.objects.get(user=request.user)
-                tokens = Token.objects.get(user=user, course=int(course))
-                flushed = 1
-                course = tokens.course.title +" ("+ str(tokens.course.code) +") "
-                tokens.delete()
-            else:
-                flushed = 0
-                tokens = Token.objects.filter(level=int(level), semester=int(semester), course=int(course))
-                course = tokens[0].course.title +" ("+ str(tokens[0].course.code) +") "
-                for t in tokens:
-                    t.delete()
-                    flushed += 1
-        except:
-            flushed = 0
-            course = "Selected Course"
-        return render(request, "cbt/token.html", {"flushed": flushed, "flush": True, "level": display_level(level), "semester": display_semester(semester), "course": course, }, )
-    else:
+    if not can_add_question(request):
         return render(request, "cbt/choose.html", {"perm": False} )
+    try:
+        if int(username):
+            user = UserDetail.objects.get(user=request.user)
+            tokens = Token.objects.get(user=user, course=int(course))
+            flushed = 1
+            course = f"{tokens.course.title} ({str(tokens.course.code)}) "
+            tokens.delete()
+        else:
+            flushed = 0
+            tokens = Token.objects.filter(level=int(level), semester=int(semester), course=int(course))
+            course = f"{tokens[0].course.title} ({str(tokens[0].course.code)}) "
+            for t in tokens:
+                t.delete()
+                flushed += 1
+    except:
+        flushed = 0
+        course = "Selected Course"
+    return render(request, "cbt/token.html", {"flushed": flushed, "flush": True, "level": display_level(level), "semester": display_semester(semester), "course": course, }, )
 
 
 

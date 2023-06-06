@@ -35,7 +35,7 @@ def can_modify(request, creator):
 
 
 def can_like(request):
-    return True if request.user.is_active else False
+    return bool(request.user.is_active)
 
 
 
@@ -53,19 +53,18 @@ def grade(score, int_grade=False):
         elif score >= 35:
             return 1
         else: return 0
-    
-    else:
-        if score >= 70:
-            return "A"
-        elif score >= 60:
-            return "B"
-        elif score >= 50:
-            return "C"
-        elif score >= 40:
-            return "D"
-        elif score >= 35:
-            return "E"
-        else: return "F"
+
+    elif score >= 70:
+        return "A"
+    elif score >= 60:
+        return "B"
+    elif score >= 50:
+        return "C"
+    elif score >= 40:
+        return "D"
+    elif score >= 35:
+        return "E"
+    else: return "F"
 
 
 def gpa(data):

@@ -19,9 +19,9 @@ class RegisterUserForm(ModelForm):
     def clean_verify_password(self):
         data = self.cleaned_data["verify_password"]
         user_pass = self.cleaned_data["password"]
-        if not data == user_pass:
+        if data != user_pass:
             raise forms.ValidationError(_("Invalid passwords: Password and Verify Password didn't match. Please enter the same password in both fields."))
-        
+
         return data
 
 
